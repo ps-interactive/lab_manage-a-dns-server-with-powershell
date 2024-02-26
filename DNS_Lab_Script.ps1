@@ -1,258 +1,192 @@
-﻿# 1 - Create local user and group
+﻿# 3 - Install DNS service
 
-# 1.1.A - Get list of all local users
-Get-LocalUser
+# 3.1.A - Get current status of DNS service on the server
+Get-WindowsFeature -name DNS
 
-# 1.1.B - List all the properties of Admin user
-Get-LocalUser -Name Administrator | select-object *
+# 3.1.B - Istall DNS service
+Add-WindowsFeature -name DNS -IncludeAllSubFeature -IncludeManagementTools -Verbose
 
-# 1.1.C - Create a new user
-#Prompt to enter new user name
-$NewUser = Read-Host "New local admin username:"
-
-#Set password for new user and convert it in secure string
-$Password = Read-Host -AsSecureString "Create a password for $NewUser"
-
-#Create New User
-New-LocalUser "$NewUser" -Password $Password -FullName "$NewUser" -Description "Additional local admin" -AccountExpires $((get-date).AddDays(90))
-
-# Verify properties of new user
-Get-LocalUser -Name "$NewUser" | select-object *
-
-# 1.1.D - Set / Change properties of newly created user
-Set-LocalUser -Name "$NewUser" -AccountNeverExpires -PasswordNeverExpires $true
-
-# Verify changes
-Get-LocalUser -Name "$NewUser" | select-object *
-
-
-
-
-# 2 - Create local group
-
-# 1.2.A Get list of all local groups
-Get-LocalGroup
-
-# 1.2.B Create a new local group
-New-LocalGroup -Name "Group1" -Description "This is a test group"
-
-
-
-
-# 3 - Add local user to local group
-
-# 1.3.A - Get members of local admin group
-Get-LocalGroupMember -Group Administrators
-
-# 1.3.B - Add Admin1 user to local admin group
-Add-LocalGroupMember -Member "$NewUser" -Group Administrators
-
-# 1.3.C - Verify changes
-Get-LocalGroupMember -Group Administrators
+# 3.1.C - Verify the status of DNS service
+Get-WindowsFeature -name DNS
 
 
 
 #########################################################################################################
 
-# 2 - Install / Uninstall Windows Roles and Features
+# 4 - Configuring DNS Primary Zones
 
-# 1 - Retrieve Roles and Features
-# 2.1.A - Retrieve Windows Roles and Features
-Get-WindowsFeature | select Displayname, Name, Installstate
+# 1 - Manage standard Primary zones
+# 4.1.A - Create standard Primary zones
+$ZoneList = Get-Content .\Lab_Files\CH4_Standard_zones.txt
+foreach ($zone in $ZoneList)
+{
+    Add-DnsServerPrimaryZone -Name "$zone.com" -ZoneFile "$zone.com.dns" -DynamicUpdate NonsecureAndSecure -Verbose
+}
+Get-DnsServerZone -name "StdZone1"
+Get-DnsServerZone -name "StdZone2"
 
-# 2.1.B - Retrieve only Windows Roles
-Get-WindowsFeature | Where-Object{$_.featuretype -eq "Role"} | select Displayname, Installstate, featuretype
+# 4.1.B - Verify the DNS zone files created in the System32/DNS folder
+Get-ChildItem C:\Windows\System32\DNS
 
-# 2.1.C - Retrieve only Windows Features
-Get-WindowsFeature | Where-Object{$_.featuretype -eq "Feature"} | select Displayname, Installstate, featuretype
+# 4.1.C - Delete standard Primary zone
+Remove-DnsServerZone "StdZone2.com" -PassThru -Verbose
+Get-DnsServerZone -name "StdZone2"
 
-
-
-
-
-# 2 - Retrieve and install DNS role
-
-# 2.2.A - Retrieve DNS Role
-Get-WindowsFeature -Name DNS
-
-# 2.2.B - Install DNS Role, its subfeatures and management tools
-Install-WindowsFeature -Name DNS -IncludeAllSubFeature -IncludeManagementTools -Verbose
-
-# 2.2.C - Verify DNS Role installation status
-Get-WindowsFeature -Name DNS
+# 4.1.D - Create standard Primary zone using existing zone file
+Add-DnsServerPrimaryZone -Name "StdZone2.com" -ZoneFile "StdZone2.com.dns"
+Get-DnsServerZone -name "StdZone2"
 
 
+# 2 - Managing AD integrated Primary zones
+
+# 4.2.A - Create AD integrated primary zones
+$ZoneList = Get-Content .\Lab_Files\CH4_AD_Integrated_zones.txt
+foreach ($zone in $ZoneList)
+{
+    Add-DnsServerPrimaryZone -Name "$zone.com" -ReplicationScope Domain -DynamicUpdate Secure -Verbose
+}
+Get-DnsServerZone -name "ADZone1"
+Get-DnsServerZone -name "ADZone1"
 
 
-
-# 3 - Retrieve sub-features of a Role
-
-# 2.3.A - Retrieve list of sub features for a particular Windows Role
-Get-WindowsFeature -name web-server | select -ExpandProperty SubFeatures
-
-
-
-
-
-# 4 - Retrieve and install a Windows Feature
-
-# 2.4.A - Retrieve Telnet-Client Feature
-Get-WindowsFeature -Name Telnet-Client
-
-# 2.4.B - Install Telnet-Client Feature
-Install-WindowsFeature -Name Telnet-Client -IncludeAllSubFeature -IncludeManagementTools -Verbose
-
-# 2.4.C - Verify Telnet-Client install status
-Get-WindowsFeature -Name Telnet-Client
-
-
-
-
-
-# 4 - Uninstall Windows Role and Feature
-
-# 2.5.A - Uninstall Windows Role and Feature
-"DNS", "Telnet-Client" | %{Uninstall-WindowsFeature -Name $_ -IncludeManagementTools -Verbose}
-
-
-# 2.5.B - Verify Windows Role and Feature Installation Status
-"DNS", "Telnet-Client" | %{Get-WindowsFeature -Name $_}
 
 #########################################################################################################
 
+# 5 - Managing Resource records
 
-# 3 - Install / Uninstall third-party apps
+# 1 - Managing Resource records
 
-# 1 - Install application from msi file 
+# 5.1.A - Add a host record
+Add-DnsServerResourceRecordA -Name "Server01" -IPv4Address "172.31.24.140" -ZoneName "globomantics.co" -Verbose
+Add-DnsServerResourceRecordA -Name "Server20" -IPv4Address "172.31.24.20" -ZoneName "ADZone1" -Verbose
+Add-DnsServerResourceRecordA -Name "Server21" -IPv4Address "172.31.24.21" -ZoneName "ADZone1" -Verbose
 
-# 3.1.A Create Temp folder for log files
-New-Item -ItemType Directory -Path C:\Temp
-
-# 3.1.B Install 7z
-$Arguments = "/i C:\Users\Public\Desktop\LAB_FILES\Apps\7z2301-x64.msi /quiet /norestart /log C:\temp\7z_install.log"
-Start-process -FilePath "msiexec.exe" -ArgumentList $Arguments -Wait -Verbose
-
-# 3.1.C Install NodeJS
-$Arguments = "/i C:\Users\Public\Desktop\LAB_FILES\Apps\node-v18.17.1-x64.msi /quiet /norestart /log C:\temp\node_install.log"
-Start-process -FilePath "msiexec.exe" -ArgumentList $Arguments -Wait -Verbose
+Get-DnsServerResourceRecord -ZoneName "globomantics.co" -Name "Server01"
 
 
+# 5.1.B - Add a CNAME record
+Add-DnsServerResourceRecordCName -Name "www" -HostNameAlias "FS01.globomantics.co" -ZoneName "globomantics.co" -Verbose
 
+# 5.1.C - Remove a resource record
+Remove-DnsServerResourceRecord -ZoneName "globomantics.co" -RRType "A" -Name "Server01" -RecordData "172.31.24.140"
 
-# 2 - Install application using exe file
-
-# 3.2.A Silently Install Notepad++ using exe file
-Start-Process C:\Users\Public\Desktop\LAB_FILES\Apps\npp.8.5.6.Installer.x64.exe /S -NoNewWindow -Wait -PassThru
-
-
-
-
-# 3 - Uninstall application using msiexec
-
-# 3.3.A Retrieve 7z And store it in a variable
-$App = Get-WmiObject win32_product | Where-Object {$_.name -like "*7-z*"} | select-object *
-$App
-
-# 3.3.B Uninstall 7z using msiexec
-$Arguments = "/uninstall $($App.IdentifyingNumber) /quiet /norestart /log C:\temp\7z_uninstall.log"
-Start-Process -FilePath "msiexec.exe" -ArgumentList $Arguments -Wait
-
-
-
-
-
-# 4 - Uninstall Application using registry data
-
-# 3.4.A Retrieve all apps details from registry
-$Apps32 = @()
-$Apps = @()
-$Apps32 += Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" # 32 Bit
-$Apps += Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Notepad++"
-
-# 3.4.B 
-$NPPlus = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Notepad++"
-
-# 3.4.C 
-$parts = $NPPlus.QuietUninstallString -split " "
-$exe = $parts[0] + " " + $parts[1]
-$Arguments = $parts[2]
-Start-Process -FilePath $exe -ArgumentList $Arguments -Wait
-
-
-
-
-
-# 5 - Uninstall Application using Uninstall() method
-
-# 3.5.A Retrieve and uninstall NodeJS application
-$Node = Get-WmiObject win32_product | Where-Object {$_.name -like "*node*"}
-$Node.Uninstall()
 
 
 #########################################################################################################
 
 
-# 4 - Managing Path variable
+# 6 - Configuring Secondary Zones
 
-# 4.1.A - Retrieve existing Path Settings
+# 6.1.A - Create a secondary zone
+Add-DnsServerSecondaryZone -Name "ADZone1.globomantics.co" -ZoneFile "ADZone1.globomantics.co.dns" -MasterServers 172.31.24.110
 
-[Environment]::GetEnvironmentVariable("PATH", "Machine")
-[Environment]::GetEnvironmentVariable("PATH", "User")
+# 6.1.B - Configure primary zone for zone transfer
+Set-DnsServerPrimaryZone -Name "ADZone1.globomantics.co" -ComputerName "DC01.globomantics.co" -SecureSecondaries TransferToSecureServers -SecondaryServers 172.31.24.130 -Notify NotifyServers -NotifyServers 172.31.24.130 -Confirm:$False -PassThru
 
+# 6.1.C - Initiate an incremental zone transfer
+Start-DnsServerZoneTransfer -Name "ADZone1.globomantics.co" -FullTransfer
 
-# 4.1.B - Display path variable's values in properly formatted way
-
-[Environment]::GetEnvironmentVariable("PATH", "Machine") -split ";"
-
-
-
-
-
-# 4.2.A - Setting a folder path to add in environment variable
-
-$NewPath = "C:\Temp"
-
-
-# 4.2.B - Get existing system and user environment variable, add new path to it and store in variable
-
-$PathMac = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + $NewPath 
-$PathUsr = [Environment]::GetEnvironmentVariable("PATH", "User") + $NewPath
-
-
-# 4.2.C - Set system and user environment variable
-
-[Environment]::SetEnvironmentVariable( "Path", $PathMac, "Machine")
-[Environment]::SetEnvironmentVariable( "Path", $PathUsr, "User")
-
-
-# 4.3.B - Verify newly added path
-
-[Environment]::GetEnvironmentVariable("PATH", "Machine")
-[Environment]::GetEnvironmentVariable("PATH", "User")
 
 
 #########################################################################################################
 
 
-# 5 - Setting Time Zone
+# 7 - Configure Reverse Lookup Zone
 
-# 5.1.A - Get current time zone
+# 7.1.A - Create a reverse lookup zone
+Add-DnsServerPrimaryZone -NetworkID "172.31.24.0/24" -ReplicationScope Domain -DynamicUpdate Secure -Verbose
 
-Get-TimeZone
+# 7.1.B - Create a PTR record
+Add-DnsServerResourceRecordPtr -Name "130" -ZoneName "24.31.172.in-addr.arpa" -PtrDomainName "FS01.globomantics.co" 
 
-
-# 5.1.B - Get list of all available time zones
-
-Get-TimeZone -ListAvailable
-
-
-# 5.1.C - Set a new time zone on the server using time zone ID
-
-Set-TimeZone -Id "Central Standard Time"
-Get-TimeZone
+# 7.1.C - Test and verify reverse lookup name resolution
+Resolve-DnsName 172.31.24.130
 
 
-# 5.1.D - Set a new time zone on the server using time zone name
 
-Set-TimeZone -Name "Mountain Standard Time"
-Get-TimeZone
+#########################################################################################################
+
+
+# 8 - Configure Global Names
+
+# 8.1.A - Add a Primary zone for GlobalNames
+Add-DnsServerPrimaryZone -Name "GlobalNames" -ReplicationScope Domain -DynamicUpdate Secure -Verbose
+
+# 8.1.B - Enable GlobalNames settings on the DNS server
+dnscmd dc /config /enableglobalnamessupport 1
+
+# 8.1.C - Create a PTR record inside the GlobalNames zone
+Add-DnsServerResourceRecordCName -Name "pki" -HostNameAlias "FS01.globomantics.co" -ZoneName "globomantics.co" -Verbose
+
+# 8.1.D - Verify the GlobalNames Zone working
+Resolve-DnsName pki
+
+
+
+#########################################################################################################
+
+
+# 9 - Configure DNS Forwarders
+
+# 9.1.A - Create a primary zone on FS01
+Add-DnsServerPrimaryZone -Name "ForwarderTest.com" -ZoneFile "ForwarderTest.com.dns" -DynamicUpdate NonsecureAndSecure -Verbose
+
+# 9.1.B - Add a forwarder
+Add-DNSServerForwarder 172.31.24.130
+
+# 9.1.C - Retrieve a forwarder
+Get-DNSServerForwarder
+
+# 9.1.D - Resolve query to use DNS Forwarder
+Resolve-DNSName "Plularsight.com"
+
+# 9.1.E - Remove a forwarder
+Remove-DnsServerForwarder -IPAddress 10.0.0.8 -Verbose
+
+
+
+#########################################################################################################
+
+
+# 10 - Configuring Conditional Forwarders
+
+# 10.1.A - Create a primary zone on FS01
+Add-DnsServerPrimaryZone -Name "Pluralsight.com" -ZoneFile "Pluralsight.com.dns" -DynamicUpdate NonsecureAndSecure -Verbose
+
+# 10.1.B - Add a Conditional Forwarder
+Add-DnsServerConditionalForwarderZone -Name "Pluralsight.com" -MasterServers 172.31.24.130 -PassThru
+
+# 10.1.C - Retrieve a conditional forwarder
+Get-DNSServerForwarder
+
+# 10.1.D - Remove a conditional forwarder
+Remove-DnsServerZone -Name "Pluralsight.com"
+
+# 10.1.E - Verify the removal of conditional forwarder
+Get-DNSServerForwarder
+
+
+
+#########################################################################################################
+
+
+# 11 - Configuring Zone Delegation
+
+# 11.1.A - Create a new Primary zone on a separate DNS server
+Add-DnsServerPrimaryZone -Name "DelegatedZone.com" -ZoneFile "DelegatedZone.com.dns" -DynamicUpdate NonsecureAndSecure -Verbose
+Add-DnsServerResourceRecordA -Name "DelegatedServer" -IPv4Address "172.31.24.160" -ZoneName "DelegatedZone.com" -Verbose
+
+# 11.1.B - Add a new zone delegation
+Add-DNSServerZoneDelegation -Name "globomantics.co" -ChildZoneName "DelegatedZone" -NameServer "FS01.globomantics.co" -IPAddress 172.31.24.130
+
+# 11.1.C - Retrieve a new zone delegation
+Get-DnsServerZoneDelegation -Name "globomantics.co"
+
+# 11.1.D - Verify the working of a new zone delegation
+Resolve-DnsName DelegatedServer
+
+# 11.1.E - Remove zone delegation
+Remove-DnsServerZoneDelegation -Name "globomantics.co" -ChildZoneName "DelegatedZone" -PassThru -Verbose
+
+
+#########################################################################################################
