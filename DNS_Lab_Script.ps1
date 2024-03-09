@@ -29,7 +29,7 @@ Get-DnsServerZone -name "StdZone2.com"
 Get-ChildItem C:\Windows\System32\DNS
 
 # 4.1.C - Delete standard Primary zone
-Remove-DnsServerZone "StdZone2.com" -PassThru -Verbose
+Remove-DnsServerZone "StdZone2.com" -PassThru -Verbose -Force
 Get-DnsServerZone -name "StdZone2.com"
 
 # 4.1.D - Create standard Primary zone using existing zone file
@@ -58,8 +58,8 @@ Get-DnsServerZone -name "ADZone2.com"
 
 # 5.1.A - Add a host record
 Add-DnsServerResourceRecordA -Name "Server01" -IPv4Address "172.31.24.140" -ZoneName "globomantics.co" -Verbose
-Add-DnsServerResourceRecordA -Name "Server20" -IPv4Address "172.31.24.20" -ZoneName "ADZone1" -Verbose
-Add-DnsServerResourceRecordA -Name "Server21" -IPv4Address "172.31.24.21" -ZoneName "ADZone1" -Verbose
+Add-DnsServerResourceRecordA -Name "Server20" -IPv4Address "172.31.24.20" -ZoneName "ADZone1.com" -Verbose
+Add-DnsServerResourceRecordA -Name "Server21" -IPv4Address "172.31.24.21" -ZoneName "ADZone1.com" -Verbose
 
 Get-DnsServerResourceRecord -ZoneName "globomantics.co" -Name "Server01"
 
@@ -68,7 +68,7 @@ Get-DnsServerResourceRecord -ZoneName "globomantics.co" -Name "Server01"
 Add-DnsServerResourceRecordCName -Name "www" -HostNameAlias "FS01.globomantics.co" -ZoneName "globomantics.co" -Verbose
 
 # 5.1.C - Remove a resource record
-Remove-DnsServerResourceRecord -ZoneName "globomantics.co" -RRType "A" -Name "Server01" -RecordData "172.31.24.140"
+Remove-DnsServerResourceRecord -ZoneName "globomantics.co" -RRType "A" -Name "Server01" -RecordData "172.31.24.140" -Force
 
 
 
@@ -78,13 +78,14 @@ Remove-DnsServerResourceRecord -ZoneName "globomantics.co" -RRType "A" -Name "Se
 # 6 - Configuring Secondary Zones
 
 # 6.1.A - Create a secondary zone
-Add-DnsServerSecondaryZone -Name "ADZone1.globomantics.co" -ZoneFile "ADZone1.globomantics.co.dns" -MasterServers 172.31.24.110
+Add-DnsServerSecondaryZone -Name "ADZone1.com" -ZoneFile "ADZone1.co.dns" -MasterServers 172.31.24.110 -ComputerName FS01
 
 # 6.1.B - Configure primary zone for zone transfer
-Set-DnsServerPrimaryZone -Name "ADZone1.globomantics.co" -ComputerName "DC01.globomantics.co" -SecureSecondaries TransferToSecureServers -SecondaryServers 172.31.24.130 -Notify NotifyServers -NotifyServers 172.31.24.130 -Confirm:$False -PassThru
+Set-DnsServerPrimaryZone -Name "ADZone1.com" -ComputerName "DC01.globomantics.co" -SecureSecondaries TransferToSecureServers -SecondaryServers 172.31.24.130 -Notify NotifyServers -NotifyServers 172.31.24.130 -Confirm:$False -PassThru
 
 # 6.1.C - Initiate an incremental zone transfer
-Start-DnsServerZoneTransfer -Name "ADZone1.globomantics.co" -FullTransfer
+Add-DnsServerResourceRecordA -Name "Server22" -IPv4Address "172.31.24.22" -ZoneName "ADZone1.com" -Verbose
+Start-DnsServerZoneTransfer -Name "ADZone1.com" -FullTransfer
 
 
 
