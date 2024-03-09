@@ -22,19 +22,19 @@ foreach ($zone in $ZoneList)
 {
     Add-DnsServerPrimaryZone -Name "$zone.com" -ZoneFile "$zone.com.dns" -DynamicUpdate NonsecureAndSecure -Verbose
 }
-Get-DnsServerZone -name "StdZone1"
-Get-DnsServerZone -name "StdZone2"
+Get-DnsServerZone -name "StdZone1.com"
+Get-DnsServerZone -name "StdZone2.com"
 
 # 4.1.B - Verify the DNS zone files created in the System32/DNS folder
 Get-ChildItem C:\Windows\System32\DNS
 
 # 4.1.C - Delete standard Primary zone
 Remove-DnsServerZone "StdZone2.com" -PassThru -Verbose
-Get-DnsServerZone -name "StdZone2"
+Get-DnsServerZone -name "StdZone2.com"
 
 # 4.1.D - Create standard Primary zone using existing zone file
 Add-DnsServerPrimaryZone -Name "StdZone2.com" -ZoneFile "StdZone2.com.dns"
-Get-DnsServerZone -name "StdZone2"
+Get-DnsServerZone -name "StdZone2.com"
 
 
 # 2 - Managing AD integrated Primary zones
@@ -45,8 +45,8 @@ foreach ($zone in $ZoneList)
 {
     Add-DnsServerPrimaryZone -Name "$zone.com" -ReplicationScope Domain -DynamicUpdate Secure -Verbose
 }
-Get-DnsServerZone -name "ADZone1"
-Get-DnsServerZone -name "ADZone1"
+Get-DnsServerZone -name "ADZone1.com"
+Get-DnsServerZone -name "ADZone2.com"
 
 
 
