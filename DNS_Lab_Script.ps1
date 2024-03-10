@@ -114,10 +114,10 @@ Resolve-DnsName 172.31.24.130
 Add-DnsServerPrimaryZone -Name "GlobalNames" -ReplicationScope Domain -DynamicUpdate Secure -Verbose
 
 # 8.1.B - Enable GlobalNames settings on the DNS server
-dnscmd dc /config /enableglobalnamessupport 1
+dnscmd DC01 /config /enableglobalnamessupport 1
 
 # 8.1.C - Create a PTR record inside the GlobalNames zone
-Add-DnsServerResourceRecordCName -Name "pki" -HostNameAlias "FS01.globomantics.co" -ZoneName "globomantics.co" -Verbose
+Add-DnsServerResourceRecordCName -Name "pki" -HostNameAlias "FS01.globomantics.co" -ZoneName "globalnames" -Verbose
 
 # 8.1.D - Verify the GlobalNames Zone working
 Resolve-DnsName pki
@@ -130,7 +130,7 @@ Resolve-DnsName pki
 # 9 - Configure DNS Forwarders
 
 # 9.1.A - Create a primary zone on FS01
-Add-DnsServerPrimaryZone -Name "ForwarderTest.com" -ZoneFile "ForwarderTest.com.dns" -DynamicUpdate NonsecureAndSecure -Verbose
+Add-DnsServerPrimaryZone -Name "testcompany.com" -ZoneFile "testcompany.dns" -DynamicUpdate NonsecureAndSecure -Verbose
 
 # 9.1.B - Add a forwarder
 Add-DNSServerForwarder 172.31.24.130
@@ -139,10 +139,10 @@ Add-DNSServerForwarder 172.31.24.130
 Get-DNSServerForwarder
 
 # 9.1.D - Resolve query to use DNS Forwarder
-Resolve-DNSName "Plularsight.com"
+Resolve-DNSName "testcompany.com"
 
 # 9.1.E - Remove a forwarder
-Remove-DnsServerForwarder -IPAddress 10.0.0.8 -Verbose
+Remove-DnsServerForwarder -IPAddress 172.31.24.130 -Verbose -Force
 
 
 
@@ -160,34 +160,8 @@ Add-DnsServerConditionalForwarderZone -Name "Pluralsight.com" -MasterServers 172
 # 10.1.C - Retrieve a conditional forwarder
 Get-DNSServerForwarder
 
-# 10.1.D - Remove a conditional forwarder
-Remove-DnsServerZone -Name "Pluralsight.com"
+# 10.1.D - Resolve a conditional forwarder
+Resolve-DNSName "Pluralsight.com"
 
-# 10.1.E - Verify the removal of conditional forwarder
-Get-DNSServerForwarder
-
-
-
-#########################################################################################################
-
-
-# 11 - Configuring Zone Delegation
-
-# 11.1.A - Create a new Primary zone on a separate DNS server
-Add-DnsServerPrimaryZone -Name "DelegatedZone.com" -ZoneFile "DelegatedZone.com.dns" -DynamicUpdate NonsecureAndSecure -Verbose
-Add-DnsServerResourceRecordA -Name "DelegatedServer" -IPv4Address "172.31.24.160" -ZoneName "DelegatedZone.com" -Verbose
-
-# 11.1.B - Add a new zone delegation
-Add-DNSServerZoneDelegation -Name "globomantics.co" -ChildZoneName "DelegatedZone" -NameServer "FS01.globomantics.co" -IPAddress 172.31.24.130
-
-# 11.1.C - Retrieve a new zone delegation
-Get-DnsServerZoneDelegation -Name "globomantics.co"
-
-# 11.1.D - Verify the working of a new zone delegation
-Resolve-DnsName DelegatedServer
-
-# 11.1.E - Remove zone delegation
-Remove-DnsServerZoneDelegation -Name "globomantics.co" -ChildZoneName "DelegatedZone" -PassThru -Verbose
-
-
-#########################################################################################################
+# 10.1.E - Remove a conditional forwarder
+Remove-DnsServerZone -Name "Pluralsight.com" -Force -PassThru -Verbose
